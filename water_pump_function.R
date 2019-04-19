@@ -119,3 +119,35 @@ train$install_3 <- as.factor(train$install_3)
 # Table of the install_3 variable vs the status of the pumps
 table(train$install_3, train$status_group)
 prop.table(table(train$install_3, train$status_group), margin = 1)
+
+# Create install_3 for the test set using same top 15 from above
+test$install_3 <- substr(tolower(test$installer),1,3)
+test$install_3[test$install_3 %in% c(" ", "", "0", "_", "-")] <- "other"
+test$install_3[!(test$install_3 %in% install_top_15)] <- "other"
+test$install_3 <- as.factor(test$install_3)
+
+# Random Forest with install_3
+set.seed(42)
+model_forest <- randomForest(as.factor(status_group) ~ longitude + latitude + extraction_type_group + quantity + waterpoint_type + construction_year + install_3,
+                             data = train, importance = TRUE,
+                             ntree = 5, nodesize = 2)
+
+# Predict using the training values
+pred_forest_train <- predict(model_forest, train)
+importance(model_forest)
+confusionMatrix(pred_forest_train, train$status_group)
+
+# Predict using the test values
+pred_forest_test <- predict(model_forest, test)
+
+# Create submission data frame
+submission <- data.frame(test$id)
+submission$status_group <- pred_forest_test
+names(submission)[1] <- "id"
+
+
+
+
+
+
+
