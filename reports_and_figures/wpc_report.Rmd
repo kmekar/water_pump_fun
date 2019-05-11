@@ -1,0 +1,445 @@
+---
+title: "Predicting Waterpoint Functionality in Tanzania"
+author: "Kyle Karber"
+date: "May 3, 2019"
+output:
+  word_document: default
+  html_document: default
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      error = FALSE,
+                      message = TRUE, # change to false for final document
+                      fig.width = 5,
+                      # fig.height = 3.5,  # set width only, not fixed aspect ratio 
+                      fig.align = "center")
+library(tidyverse)
+library(cowplot)
+library(gridExtra)
+# library(ggpubr)
+library(caret)
+library(lubridate)
+# library(googleVis)
+library(lsr)
+library(corrplot)
+library(ggmap)
+library(kableExtra)
+
+options(scipen=10000)
+
+status_colors <- c("#0072B2", "#E69F00", "#CF3816")
+cb_colors <- c("#999999", "#E69F00", "#56B4E9", "#009E73", 
+               "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+```{r data, include=F}
+getwd()
+## import train and test data
+train <- read.csv(file="../data/train.csv", header=T)
+# need train data?
+
+## load basemap
+base_map <- readRDS("base_map.rds")
+
+## change certian level names for plot aesthetics
+# status_group 
+levels(train$status_group)[levels(train$status_group)=="functional needs repair"] <- "needs repair"
+levels(train$status_group)[levels(train$status_group)=="non functional"] <- "non-functional"
+# source
+levels(train$source)[levels(train$source)=="rainwater harvesting"] <- "rainwater"
+# waterpoint_type_group
+levels(train$waterpoint_type)[levels(train$waterpoint_type)=="communal standpipe multiple"] <- "multiple standpipes"
+
+
+```
+## Executive Summary
+
+
+## Introduction
+#### Background
+
+
+#### describes the dataset
+* wells and the associated pumps for drinking water, which I will predominantly refer to as waterpoints. 
+
+
+* class imbalance
+
+```{r status_group}
+
+train %>% ggplot(aes(status_group)) +
+  geom_bar(aes(y=(..count..)/sum(..count..), fill=status_group), width=0.7) +
+  # ggtitle("Waterpoint Condition") +
+  geom_text(stat='count', aes(y=(..count..)/sum(..count..), 
+                              label=paste("n = ", ..count..)), vjust=-0.2) +
+  xlab("") +
+  ylab("proportion") +
+  scale_x_discrete(breaks=levels(train$status_group), 
+                       labels=c("functional", 
+                                "functional,\nneeds repair",
+                                "non-functional")) +
+  scale_y_continuous(limits=c(0, 0.6)) +
+  scale_fill_manual(values=status_colors) +
+  theme(legend.position="none")
+```
+
+#### summarizes the goal of the project 
+* The objective of this project is to ...
+... competition performance is secondary to having a useful tool for predicting waterpoint failure not only at the time this data was collected but also predict likely failures in the future
+
+
+#### summarizes key steps that were performed
+
+
+## Methods
+
+### explains the process and techniques used, such as data cleaning, data exploration and visualization, 
+### any insights gained 
+### modeling approach
+
+#### Feature Selection
+* Inital vetting through exploratory data analysis
+
+There were a significant number of hierarchical/overlapping variables, so they could not all be included in the feature selection process due to issues of multicolinearity. I will refer to these as grouped features. For example, `source`, `source_type`, and `source_class` are all directly related to the water source, but they range in the amount of detail in the levels - they have 10, 7, and 3 unique levels, respectively. For grouped features such as these I chose the variable based on the number of unique levels (not too many or too few) and the number of waterpoints in each level (e.g. if certain levels had few waterpoints and were combined with another level in an overlapping feature, this less detailed feature was chosen). As part of the model tuning process, grouped features were substituted for one another and the simplest feature that didn't negatively impact model accuracy was chosen. Grouped features and my inital selection thereof are discussed further in the exploratory data analysis section.
+
+While some of the features were obviously correlated due to their hierarchical nature, other features need to be tested for correlation. I created a correlation matrix for variables that I identified as possible predictors through exploratory data analysis, including my initally selected features among the overlapping variables. Since these features included a mix of numeric and categorical data, I used a custom function (citation) to calculate correlations. This function used Pearson's correlation for numeric pairs, chi-squared test for categorical pairs, and the linear regression correlation coefficient for for numeric-categorical pairs.
+
+* recursive feature elimination (RFE)
+
+"In general, with a multistep modeling procedure, cross-validation must
+be applied to the entire sequence of modeling steps. In particular, samples
+must be “left out” before any selection or filtering steps are applied. There
+is one qualification: initial unsupervised screening steps can be done before
+samples are left out. For example, we could select the 1000 predictors
+with highest variance across all 50 samples, before starting cross-validation.
+Since this filtering does not involve the class labels, it does not give the
+predictors an unfair advantage." (EoSL p.246-247)
+
+#### Model Selection and Assessment
+* I followed the model selection guideline provided by (APM p.79):
+1. Start with several models that are the most flexible (but least interpretable) - models that have a high likelihood of being the most accurate across a variety of domains. These models establish the "performance ceiling." I chose to use a random forest classifier and gradient boosted decision tree classifier (xgboost) to establish the performance ceiling.
+2. Apply simpler more interpretable models for comparison. I chose to use multinomial logistic regression and k-nearest neighbors models. 
+3. Use the simplest model that closely approximates the performance of more complex models. 
+
+More on these:?
+* random forest
+* xgboost
+* multinomial logistic regression
+* k-nearest neighbors
+
+* "In this section we develop two simple but powerful prediction methods: the
+linear model fit by least squares and the k-nearest-neighbor prediction rule.
+The linear model makes huge assumptions about structure and yields stable
+but possibly inaccurate predictions. The method of k-nearest neighbors
+makes very mild structural assumptions: its predictions are often accurate
+but can be unstable." (EoSL p.11)
+
+
+In order to select a model I needed to accurately assess their performance.  
+
+
+* 10-fold cross validation used for feature selection and model selection
+"Several researchers show that validation using a single test set 
+can be a poor choice." (APM p.67)
+
+"An alternate approach to evaluating a model on a single test set is to
+resample the training set. This process uses several modified versions of the
+training set to build multiple models and then uses statistical methods to
+provide honest estimates of model performance (i.e., not overly optimistic)." (APM p.66)
+
+"The choice of k is usually 5 or 10, but there is no formal rule. As k gets
+larger, the difference in size between the training set and the resampling
+subsets gets smaller. As this difference decreases, the bias of the technique
+becomes smaller (i.e., the bias is smaller for k = 10 than k = 5). In this
+context, the bias is the difference between the estimated and true values of
+performance." (APM p.70)
+
+"Another important aspect of a resampling technique is the uncertainty
+(i.e., variance or noise). An unbiased method may be estimating the correct
+value (e.g., the true theoretical performance) but may pay a high price in
+uncertainty. This means that repeating the resampling procedure may produce
+a very different value (but done enough times, it will estimate the true
+value). k-fold cross-validation generally has high variance compared to other
+methods and, for this reason, might not be attractive. It should be said that
+for large training sets, the potential issues with variance and bias become
+negligible." (APM p.70)
+
+"Research (Molinaro 2005; Kim 2009) indicates that repeating k-fold crossvalidation
+can be used to effectively increase the precision of the estimates
+while still maintaining a small bias." (APM p.70)
+
+"No resampling method is uniformly better than another; the choice should
+be made while considering several factors. If the samples size is small, we
+recommend repeated 10-fold cross-validation [...]. If the goal is to choose between models, as opposed to getting the best indicator of performance, a strong case can be made for using one of the bootstrap procedures since these have very low variance.
+For large sample sizes, the differences between resampling methods become
+less pronounced, and computational efficiency increases in importance. Here,
+simple 10-fold cross-validation should provide acceptable variance, low bias,
+and is relatively quick to compute." (APM p.78)
+
+* 
+
+* Final models:
+  + single best model
+  + single best model with data leakage
+  + ensemble model
+
+* "Often a “one-standard error” rule is used with cross-validation, in which we choose the most parsimonious model whose error is no more than one standard error above
+the error of the best model." (EoSL p.244)
+
+* I assessed the final models by submitting them to the drivendata.org competition. The submissions were evaluated based on the classification rate, i.e. the overall accuracy. This assessment was only done once the final models were completed; the drivendata.org competition results were not used for feature selection or model tuning, in order to assess model prediction error (generalization error - EoSL term p.222) on new data. 
+
+#### Parameter Tuning
+* maybe put this within the above section
+"Since many of these parameters control the complexity of the model, poor
+choices for the values can result in over-fitting." (APM p.65)
+
+#### Ensemble Model?
+
+
+* Update prediction with updated/current years operational
+
+* Resource allocation
+- sort/select by quality group
+
+
+## Exploratory Data Analysis
+
+The dataset consists of 40 features (predictor variables), including the waterpoint name and ID. The target (outcome variable) of interest is the waterpoint condition (`status_group`). The majority of the data was recorded between 2011 and 2013, but some of the data was recorded as early as 2002. I've organized the features into five descriptive categories: location features, funder and installer, waterpoint features, payments and management, and unused features. I explore the features in these categories in more detail below. 
+
+There were a number of features that were either redundant or their meaning was unclear, so they were not included in the modeling process. This includes: `wpt_name` (redundant with `id`), `num_private` (unknown meaning, low variance), `public_meeting` (unknown meaning, low variance), `recorded_by` (zero variance), and `scheme_name` (unknown meaning, likely redundant).
+
+
+#### Location Features
+
+There were eight features directly related to the waterpoint location (latitude, longitude, subvillage, ward, lga, region, region_code, and district code) and three features related to location (population, altitude, basin). Subvillage, ward, lga, region, and district are all geographic subdivisions, from smallest to largest. Although region is a subdivision of district, there are more unique regions codes (27) than district codes (20). Additionally, the number of unique region names (21) is smaller than the number of regions codes. Because of these discrepancies, I decided to focus on the latitude and longitude location features. About 3% of the longitude data is missing (zeros), but none of the latitude data is missing. The latitude longitude coordinates of the waterpoints colored by functionality are shown in the figure below. 
+
+```{r map, fig.width=8.5}
+# load basemap
+base_map <- readRDS("base_map.rds")
+# plot waterpoints on base map
+ggmap(base_map) +
+  geom_point(aes(x=longitude, y=latitude, color = status_group), data=train, 
+             shape=16, alpha=0.35) +
+  scale_color_manual(values=status_colors) +
+  theme_void() +
+  theme(legend.title = element_blank()) +
+  guides(colour = guide_legend(override.aes = list(size=3, alpha = 0.8)))
+
+```
+
+Nearly half of the population data was missing (recorded as zeros or ones), so I tried two different imputation methods. The first simply imputed the median population of the region (`region_code`) where the waterpoint is located. However, because of the large amount of missing population data, about one-fourth of the regions had a median population of zero. Thus, even after imputation, about one-third of the population data was still zero. 
+
+The second method used the k-nearest neighbors (KNN) algorithm, with latitude and longitude as the only inputs and the log10 transform of population as the target. Using 10-fold cross-validation, the R^2^ was 0.58 and the RMSE was 0.31. It is not straightforward to interpret the RMSE of a log transformed variable; it is not simply $10^{0.31}=2.0$. For some context, the mean population is 15 and if you were to add and subtract the RMSE from this value you would get 31 and 8 people, respectively. While the imputation error is likely better than that of imputing the overall median or medain by region, there is still significant error. In the future I will include publicly available population density data in the imputation to further improve accuracy. 
+
+Since missing numerical data is recorded as zeros in this dataset, we cannot differentiate between missing `gps_height` data and waterpoints that are actually at sea level. In the future, I will verify the accuracy of the gps heights by checking it against elevation data for a given latttude and longitude. The `basin` feature is comprised of the geographic water basins.
+
+* included lga as the location variable for the logistic regression instead of latitude and longitude, since it is very unlikely that source would be linearly dependent on GPS coordinates. 
+
+#### Funder and Installer 
+The dataset includes information on who funded the well (`funder`) and who installed it (`installer`). There were 1898 unique funders and 2146 unique installers recorded. However, they were not truely unique as the same funder/installer was sometimes recorded under different names. For example, "Government", "Gover", "GOVER", "Govt", "Central government." I first converted all levels to lowercase strings, then identified the government related levels with the regex `"(gov)|(dist)|(coun)"`. I then examined the strings with the detected pattern and developed a regex to exclude misidentified strings, `"(village)|(comm)|(china)|(belgian)|(finland)|(irish)|(ital)|(japan)|(iran)|(egypt)|(methodist)"`. I similarly identified community/village funders and installers with the regex `"(comm)|(vill)"`, while excluding `"(committe)|(bank)"`. I retained the top 10 and 20 funders and installers, and changed the rest to "other." There is significant overlap between the top funders and installers. The figure below shows the top 10 installers broken down by waterpoint condition. 
+
+```{r installer, fig.height=4.5}
+
+train %>% group_by(installer10) %>% 
+  mutate(installer_tot = n()) %>% ungroup() %>%
+  ggplot(aes(x=reorder(installer10, status_group=="non-functional"), fill=status_group)) +
+  geom_bar(position="fill") +
+  geom_hline(yintercept=0.384, size=1) +
+  geom_text(aes(label=paste("n = ", installer_tot), y=1), hjust=1) +
+  coord_flip() +
+  scale_fill_manual(values=status_colors) +
+  ylab("proportion") +
+  xlab("installer") +
+  theme(legend.position=c(-0.3, 1.08), 
+        legend.title = element_blank(), 
+        legend.spacing.x=unit(2, "mm"),
+        legend.direction="horizontal")
+# could add tick at y-intercept=0.38
+```
+
+```{r funders, include=F}
+
+funder_plot <- train %>% group_by(funder10) %>% 
+  mutate(funder_tot = n()) %>% ungroup() %>%
+  ggplot(aes(x=reorder(funder10, status_group=="non-functional"), fill=status_group)) +
+  geom_bar(position="fill") +
+  geom_hline(yintercept=0.384) +
+  geom_text(aes(label=funder_tot, y=1), hjust=1) +
+  coord_flip() +
+  scale_fill_manual(values=status_colors) +
+  ylab("proportion") +
+  xlab("funder") +
+  theme(legend.position="top", legend.title = element_blank())
+
+# grid.arrange(funder_plot, installer_plot, nrow=1)
+# how to combine legend?
+# ggarrange(funder_plot, installer_plot, nrow=1, common.legend=TRUE, legend="top")
+```
+
+
+#### Waterpoint Features
+
+There are a number of waterpoint features in this dataset, including the construction year, permit, water source, extraction type, waterpoint type, and water quality. A little over one-third of the construction year data was missing. In the furure I will impute missing construction year data. The figure below shows the construction year data broken down by functionality. 
+
+```{r construction_year, fig.width=7}
+# histogram for construction_year grouped by status_group
+train %>% filter(construction_year > 0) %>%
+  ggplot(aes(construction_year, fill=status_group)) + 
+  geom_histogram(bins = 15, color="grey40") + 
+  scale_fill_manual(values=status_colors) +
+  xlab("construction year") +
+  facet_grid( ~ status_group) +
+  theme(legend.position = "none")
+```
+I created a new variable, `years_op` (i.e. years operational), that was the time elapsed between the construction year and the year this data was recorded, since it was recorded over an 11 year timeframe. This was intended to help narrow down the number of years that the waterpoint was operational, but since we do not have data on the actual year of failure this is a source of uncertainty. This new variable made it possible to predict which wells have failed since the data was recorded, by adding the number of years elapsed since the data was recorded to `years_op` and re-running the waterpoint functionality predictions.
+
+```{r years_op?}
+# figure with years_op histogram? 
+```
+
+The next waterpoint feature is `permit`. While not explicitly defined, this feature most likely represents whether a permit was recieved for the installation of a waterpoint. The table below shows permit broken down by the functional status of the well. Functional status does not vary much by permit, so this feature is likely to have little predictive power. However, it was still included in the recursive feature elimination variable selection process.
+
+```{r permit}
+prop.table(table(train$permit, train$status_group), margin = 1) %>% 
+  kable(digits = 2) %>% kable_styling(bootstrap_options = "condensed", full_width = F)
+```
+
+The next waterpoint feature group is the water source, which includes `source`, `source_type`, and `source_class`, with 10, 7, and 3 unique levels respectively. My inital selection was `source_type`, but the more detailed `source` variable is broken down by functional status in the figure below.
+
+```{r source, fig.height=4.5}
+train %>% group_by(source) %>% 
+  mutate(tot = n()) %>% ungroup() %>%
+  ggplot(aes(x=reorder(source, status_group=="non-functional"),
+             fill=status_group)) +
+  geom_bar(position="fill") +
+  geom_hline(yintercept=0.384, size=1) +
+  geom_text(aes(label=paste("n = ", tot), y=1), hjust=1) +
+  coord_flip() +
+  scale_fill_manual(values=status_colors) +
+  ylab("proportion") +
+  xlab("water source") +
+  ggtitle("") + # needed for blank space for legend position
+  theme(legend.title=element_blank(),
+        legend.position=c(-0.3, 1.08),
+        legend.spacing.x=unit(2, "mm"),
+        legend.direction="horizontal")
+```
+
+The next waterpoint feature group was the extraction type, meaning the method of extracting water from the water source. This group included `extraction_type`, `extraction_type_class`, and `extraction_type_group`, with 18, 13, and 7 unique levels, respectively. My inital selection was `extraction_type_class`, which is broken down by functional status in the figure below.
+
+```{r extraction_type, fig.height=3.5}
+train %>% group_by(extraction_type_class) %>% 
+  mutate(tot = n()) %>% ungroup() %>%
+  ggplot(aes(x=reorder(extraction_type_class, status_group=="non-functional"),
+             fill=status_group)) +
+  geom_bar(position="fill") +
+  geom_hline(yintercept=0.384, size=1) +
+  geom_text(aes(label=paste("n = ", tot), y=1), hjust=1) +
+  coord_flip() +
+  scale_fill_manual(values=status_colors) +
+  ylab("proportion") +
+  xlab("extraction  type") +
+  ggtitle("") + # needed for blank space for legend position
+  theme(legend.title=element_blank(),
+        legend.position=c(-0.3, 1.08),
+        legend.spacing.x=unit(2, "mm"),
+        legend.direction="horizontal")
+```
+
+The next waterpoint feature group was the waterpoint type, meaning the method of dispensing the water. This group included `waterpoint_type` and `waterpoint_type_group`. The only difference was that the latter combined "community standpipe" with "community standpipe multiple." The `waterpoint_type` with the additional bit of detail was the feature that I initally selected in this group, and it is shown by status group in the figure below.
+
+```{r waterpoint_type, fig.height=3.5}
+train %>% group_by(waterpoint_type) %>% 
+  mutate(wp_type_tot = n()) %>% ungroup() %>%
+  ggplot(aes(x=reorder(waterpoint_type, status_group=="non-functional"),
+             fill=status_group)) +
+  geom_bar(position="fill") +
+  geom_hline(yintercept=0.384, size=1) +
+  geom_text(aes(label=paste("n = ", wp_type_tot), y=1), hjust=1) +
+  coord_flip() +
+  scale_fill_manual(values=status_colors) +
+  ylab("proportion") +
+  xlab("waterpoint  type") +
+  ggtitle("") + # needed for blank space for legend position
+  theme(legend.title=element_blank(),
+        legend.position = c(-0.4, 1.08),
+        legend.spacing.x=unit(2, "mm"),
+        legend.direction = "horizontal")
+```
+
+The last waterpoint feature group is water quality, including `water_quality` and `quality_group`, with 8 and 6 levels respectively. These features are very similar, so I initally prefered the simpler variable, `quality_group`. The majority of waterpoints have "good" water quality (50,818), 5,195 have "salty" water, 1,876 have unknown water quality, and the remaining 1,511 have either milky, colored, or fluoride water quality. 
+
+* is "unknown" data leakage? 
+
+Additionally, one feature group was flagged as data leakage, `quantity` and `quantity_group`, meaning they provide information that would not realistically be available at the time of prediction. These features qualitatively reveal how much water flows from the waterpoint. In order to obtain quantity data we would also observe the functional status of the well. For example, waterpoints with quantity of "dry" are almost entirely non-functional. Presumably, when making new predictions in the future quantity data would not be available for waterpoints with an unknown functional status. As such, I have developed my models without the quantity features. For comparison purposes, I added `quantity` to my final models to see how much this leaky predictor improves model accuracy. 
+
+* replace "accuracy" with "performance" to more generally refer to the metric(s) I used to assess my models?
+
+
+#### Payments and Management
+There are two related payment features in the dataset: payment amount in Tanzanian Shillings (`amount_tsh`) and the type or frequency of payment (`payment_type`), which could be by the bucket, monthly, or yearly for example. At first glance it may appear that 70% of the `amount_tsh` data is missing (recorded as zeros) but when you account for zeros in the `payment_type` categories of "never pay," "unknown," and "on failure," less than 10% of the data appear to be erroniously recorded as zero. A smoothed histogram of non-zero payment amounts in Tanzanian Shillings (Tsh) broken down by payment type is shown below. Note that one US dollar was equivalent to about 1,500 Tsh around the time most of these data were recorded. 
+
+```{r amount_tsh, include=F, fig.width=7}
+train %>% filter(amount_tsh > 0, !payment_type=="never pay", 
+                 !payment_type=="other", !payment_type=="unknown") %>% 
+  ggplot(aes(amount_tsh, fill=payment_type)) +
+  geom_histogram(bins=30) +
+  scale_x_log10(limits=c(1,350000)) +
+  #theme_bw() +
+  scale_fill_manual(values=cb_colors, name="payment type") +
+  xlab("payment amount in Tsh (log scale)")
+```
+
+```{r amount_tsh2, fig.width=7}
+train %>% filter(amount_tsh > 0, !payment_type=="never pay", 
+                 !payment_type=="other", !payment_type=="unknown") %>% 
+  ggplot() +
+  geom_density(aes(x=amount_tsh, y=(..count..)*2, fill=payment_type),  
+               adjust=2, alpha=0.5) + # multiply count by adjust value to get correct count
+  scale_x_log10(limits=c(1,350000)) +
+  #theme_bw() +
+  scale_fill_manual(values=c("darkturquoise", "red", "orange", "darkgrey"), name="payment type") +
+  xlab("payment amount in Tsh (log scale)") +
+  ylab("count")
+```
+
+The median payment per bucket was 20 Tsh (~\$0.01), the median monthly payment was 300 Tsh (~\$0.20), and the median annual payment was 2000 Tsh (~\$1.33). Thus, the relationship between payment amount and payment type is as one might expect. The log<sub>10</sub> transform of non-zero values of `amount_tsh` were saved as a new feature (`amount_log`) because its distribution was closer to normal (zeros were retained). 
+
+Note that the limited information provided on this dataset shows `amount_tsh` to be the "total static head," which is essentially a measure of water pressure. If this was the true meaning, this variable should be highly correlated with the water quantity as well as the waterpoint status. I.e. if there is zero water pressure there would be zero water flow, so `quantity` should be dry and `status` should be "non-functional." However, the relationship between `amount_tsh` and these two variables is not as expected. The correlation coefficents between log<sub>10</sub>(`amount_tsh`) and `quantity` and `status_group` are 0.18 and 0.21, respectively. The correlation coefficents between log<sub>10</sub>(`amount_tsh`) and `payment_type` is 0.78. Additionally, total static head is typically measured in feet or meters, and many of the values for `amount_tsh` are astronomical compared to even high-horsepower waterpumps, nevermind handpumps. 
+
+There are three management related features which are assumed to represents who manages the well, including the payment process -- though the exact meaning of these variables is unclear. These features are `scheme_management`, `management`, and `management_group`, with 10, 9, and 5 unique levels respectively. I selected `management` as the inital feature for model building.
+
+
+#### Correlations
+
+
+#### Summary of Features
+
+
+## Results
+
+* figure of accuracy VS # variables
+
+#### Tuning
+
+"When the number of variables is large, but the fraction of relevant variables
+small, random forests are likely to perform poorly with small m. At each
+split the chance can be small that the relevant variables will be selected." (EoSL p.596)
+* figure of accuracy VS trees/mtry? probably not necessary
+
+* the `year_op` feature (`year_recorded-construction_year`) resulted in greater accuracy than `construction_year`.
+
+
+#### Partial Dependence Plots
+
+
+#### ROC
+Because of the consequences resulting from a lack of potable water, it is more important to identify wells that require repair than to identify (or misidentify) functioning wells. 
+
+## Conclusion
+
+
+
+
