@@ -394,8 +394,8 @@ test <- test %>% select(-payment)
 ## quality_group ##
 # quality of the water coming from the well
 # water_quality may be data leakage, because some levels specify "abandoned", e.g. "salty abandoned"
-# the association between "abandoned"  in "water_quality" and status_group is not clear,
-# but use "quality_group" anyways
+# also, "unknown" is predominantly non-functional
+
 train %>% group_by(water_quality) %>% count() %>% arrange(desc(n))
 train %>% group_by(quality_group) %>% count() %>% arrange(desc(n))
 prop.table(table(train$water_quality, train$status_group), margin = 1) %>% round(2)
