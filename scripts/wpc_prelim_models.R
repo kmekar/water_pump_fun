@@ -52,12 +52,8 @@ y <- train$status_group
 x <- train %>% select(amount_tsh, installer20, longitude, latitude, gps_height, 
                       pop_log3, permit, years_op, extraction_type_group,
                       management, payment_type, source_type, waterpoint_type)
-# train RFE modwl
+# train RFE model
 model_rfe <- rfe(x, y, sizes=c(2:6)*2, rfeControl=rfe_control)
-# save model
-saveRDS(model_rfe, "./models/feature_elimination.rds")
-# load model
-# model_rfe <- readRDS("./models/feature_elimination.rds")
 # Summarize results
 print(model_rfe)
 # list features selected
@@ -76,6 +72,13 @@ model_rfe$results %>% ggplot(aes(Variables, Accuracy)) +
 # Define model features
 x_10 <- x %>% select(-amount_tsh, -source_type, -permit)
 
+# save model
+saveRDS(model_rfe, "./models/feature_elimination.rds")
+# load model
+model_rfe <- readRDS("./models/feature_elimination.rds")
+# save just the results
+results_rfe <- model_rfe$results
+saveRDS(results_rfe, "./results/rfe.rds")
 
 #### Tune model parameters ####
 # define 10-fold cross-validation training method
@@ -108,7 +111,7 @@ results_rf_trees <- data.frame("n_trees" = c(51,101,201,301,501),
                                "ci" = results_rf_trees_ci)
 rownames(results_rf_trees) <- NULL
 # save
-saveRDS(results_rf_trees, "./models/results_rf_trees.rds")
+saveRDS(results_rf_trees, "./results/rf_trees.rds")
 
 ## load model or results
 # model_rf_trees <- readRDS("./models/rf_trees.rds")
@@ -128,6 +131,9 @@ grid_rf <- expand.grid(mtry=3)
 saveRDS(model_rf_mtry, "./models/rf_mtry.rds")
 # load model
 # model_rf_mtry <- readRDS("./models/rf_mtry.rds")
+# save just the results
+results_rf_mtry <- model_rf_mtry$results
+saveRDS(results_rf_mtry, "./results/rf_mtry.rds")
 
 #_________________________________
 #### Try alternative features ####
@@ -236,11 +242,11 @@ results_rf_tests_ci <- stack(sapply(results_rf_tests, `[[`, "AccuracySD")*1.96/s
 # combine accuracy and SE into a single dataframe
 results_rf_tests <- left_join(results_rf_tests_acc, results_rf_tests_ci, by="ind")
 results_rf_tests <- setNames(results_rf_tests, c("test_name", "accuracy", "ci"))
-saveRDS(results_rf_tests, "./models/results_rf_tests.rds")
+saveRDS(results_rf_tests, "./results/rf_tests.rds")
 
 ## load models or results
 # model_rf_tests <- readRDS("./models/rf_tests.rds")
-# results_rf_tests <- readRDS("./models/results_rf_tests.rds")
+# results_rf_tests <- readRDS("./results/f_tests.rds")
 
 
 #______________________________________
@@ -442,7 +448,7 @@ results_all <- data.frame("model" = c("rf", "leak", "xgb", "multinom", "knn", "v
                                                   model_xgb$results$AccuracySD[model_xgb$results$Accuracy==max(model_xgb$results$Accuracy)],
                                                   model_multinom$results$AccuracySD, 
                                                   model_knn$results$AccuracySD, NA, NA))
-# saveRDS(results_all, "./models/results_all.rds")
+# saveRDS(results_all, "./results/all_models.rds")
 
 
 #### ROC Curves ####
@@ -536,7 +542,7 @@ write.csv(submission_stack, "./output/submission_stack.csv", row.names=F)
 
 # save final results
 results_all <- results_all %>% mutate(test = c(0.7801, 0.8125, 0.7601, NA, NA, 0.7728, 0.7800))
-saveRDS(results_all, "./models/results_all.rds")
+saveRDS(results_all, "./results/all_models.rds")
 
 
 #________________________________________________
