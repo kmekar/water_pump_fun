@@ -2,6 +2,8 @@
 ##########   Preprocessing and Exploratory Data Analysis   ###########%
 ######################################################################%
 
+## Overview:
+
 ### Load libraries ###
 library(tidyverse)
 library(lubridate)
@@ -15,9 +17,9 @@ library(cowplot)
 ### Load custom functions ###
 ## correlation function
 # computes the correlation coefficent (r or its equivalent) across data types, e.g.:
-# continuous V continuous - 
-# continuous V categorical/factor - 
-# categorical V categorical - 
+# numeric V numeric - Pearson’s r
+# categorical V categorical - chi squared
+# numeric V categorical/factor - linear regression correlation coefficient
 source("./scripts/cor2Fun.R")
 
 ### Define colors for waterpoint status
@@ -130,7 +132,7 @@ train %>% group_by(extraction_type_class) %>%
 sum(train$date_recorded == 0)/n  # no zeros
 qplot(year(train$date_recorded))  # mostly recorded between 2011 and 2013
 min(year(train$date_recorded))  # recorded as early as 2002
-# convert to year recorded for later manipulation
+# create year recorded feature later manipulation
 train$year_recorded <- as.integer(year(train$date_recorded))
 test$year_recorded <- as.integer(year(test$date_recorded))
 
@@ -514,7 +516,7 @@ train$funder10[!(train$funder10 %in% funder_top10)] <- "other"
 train$funder10 <- as.factor(train$funder10)
 # same for test set
 test$funder10 <- test$funder20
-funder_top10 <- names(summary(as.factor(test$funder10)))[1:10]
+#funder_top10 <- names(summary(as.factor(test$funder10)))[1:10]
 test$funder10[!(test$funder10 %in% funder_top10)] <- "other"
 test$funder10 <- as.factor(test$funder10)
 # reduce funder20 to top 20 funders
@@ -523,7 +525,7 @@ train$funder20[!(train$funder20 %in% funder_top20)] <- "other"
 train$funder20 <- as.factor(train$funder20)
 summary(train$funder20)
 # same for test set
-funder_top20 <- names(summary(as.factor(test$funder20)))[1:20]
+#funder_top20 <- names(summary(as.factor(test$funder20)))[1:20]
 test$funder20[!(test$funder20 %in% funder_top20)] <- "other"
 test$funder20 <- as.factor(test$funder20)
 summary(test$funder20)
@@ -707,7 +709,7 @@ var <- c("amount_tsh", "amount_log", "gps_height", "installer20", "funder20",
 # calculate correlations for mixed feature types using cor2() function
 corr <- train %>% select(var) %>% cor2()
 # plot correlation matrix
-corrplot.mixed(corr)
+corrplot.mixed(corr, tl.pos ="lt", tl.col="black")
 
 ## correlated (R > 0.5):
 # payment_type and (payment) amount_log (but not amount_tsh) 
@@ -716,13 +718,23 @@ corrplot.mixed(corr)
 # pop_log and gps_height with construction year (but not years_op)
 
 
+### Initally modeled variables
+modeled <- c("amount_tsh", "installer20", "longitude", "latitude", "gps_height", 
+                 "pop_log3", "permit", "years_op", "extraction_type_group",
+                 "management", "payment_type", "source_type", "waterpoint_type")
+# calculate correlations for mixed feature types using cor2() function
+corr_modeled <- train %>% select(modeled) %>% cor2()
+# plot correlation matrix
+corrplot.mixed(corr_modeled, tl.pos ="lt", tl.col="black")
+
+
 ### Location Variables
 loc <- c("longitude", "latitude", "region_code", "district_code", "lga",
          "gps_height", "basin")
 # calculate correlations for mixed feature types using cor2() function
-corr <- train %>% select(loc) %>% cor2()
+corr_loc <- train %>% select(loc) %>% cor2()
 # plot correlation matrix
-corrplot.mixed(corr)
+corrplot.mixed(corr_loc, tl.pos="lt", tl.col="black")
 
 
 ### amount_tsh

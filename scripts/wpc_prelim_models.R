@@ -5,8 +5,8 @@
 ## Overview:
 # This script documents the various models I tried
 # and the tweaks and tuning thereof.
-# I recommend not to run it start to finish, 
-# as it would take a very long time -
+# I recommend NOT to run it start to finish, 
+# as it would take a very long time on a personal computer -
 # it is more of a record for future reference.
 # Most of the models have been saved to the 
 # model folder for future use. 
@@ -29,6 +29,7 @@
 library(tidyverse)
 library(caret)
 library(randomForest)
+library(pROC)
 
 
 ### Import datasets ###
@@ -217,7 +218,7 @@ varImpPlot(rf_leak$finalModel)
 # manually select model names
 rf_tests_names <- c("rf_baseline", "rf_inst","rf_fund", "rf_ext", 
                     "rf_man", "rf_pop", "rf_pop2", "rf_pay", "rf_year", 
-                    "rf_final", "rf_leak")
+                    "rf_final", "rf_final_500", "rf_leak")
 # create a list based on models names provided
 model_rf_tests <- lapply(rf_tests_names, get)
 # set names
@@ -336,7 +337,7 @@ confusionMatrix(model_xgb$pred$pred, reference=model_xgb$pred$obs)
 # save model
 saveRDS(model_xgb, "./models/xgb.rds")
 # load model
-# model_xgb <- readRDS("./models/xgb.rds")
+model_xgb <- readRDS("./models/xgb.rds")
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -369,7 +370,7 @@ model_form_log <- as.formula(status_group2 ~ installer10 + gps_height +
                                source_type + waterpoint_type)
 # logistic regression
 model_log <- train(model_form_log, data=train, method="glm", family=binomial,
-                   trControl=train_control)  # no tuning parameters
+                   trControl=train_control)
 # summary of results
 print(model_log)
 # variable importance
@@ -467,9 +468,9 @@ ggroc(roc_rf, color="blue") +
 
 ### Majority Vote
 # create list will all relevant models
-all_names <- c("rf_final", "model_xgb","model_multinom", "model_knn")
-all_models <- lapply(all_names, get)
-names(all_models) <- c("rf", "xgb", "log", "knn")
+names_all <- c("rf_final", "model_xgb","model_multinom", "model_knn")
+models_all <- lapply(names_all, get)
+names(models_all) <- c("rf", "xgb", "log", "knn")
 # make predictions
 pred_train <- as.data.frame(sapply(models_all, function(x) predict(x, train)))
 names(pred_train) <- c("rf", "xgb", "log", "knn")
@@ -486,25 +487,6 @@ stack_rf <- randomForest(target ~ rf + xgb + log + knn, data=pred_train, mtry=2,
 pred_train$stack <- predict(stack_rf, pred_train)
 print(stack_rf)
 
-#________________________________________________
-#### Update predictions with years_op to reflect current year ####
-x_update <- x_final %>% mutate(years_op = years_op + (2019 - train$year_recorded))
-mean(x_final$years_op)
-mean(x_update$years_op)
-pred_train$update <- predict(rf_final, x_update)
-sum(!pred_train$update==pred_train$rf)
-sum(pred_train$rf=="functional" & pred_train$update=="non functional")
-sum(pred_train$rf=="functional" & pred_train$update=="functional needs repair")
-sum(pred_train$rf=="functional needs repair" & pred_train$update=="non functional")
-sum(pred_train$rf=="functional needs repair" & pred_train$update=="functional")
-sum(pred_train$rf=="non functional" & pred_train$update=="functional")
-sum(pred_train$rf=="non functional" & pred_train$update=="functional needs repair")
-
-## Partial dependence plot
-pdp_f <- partialPlot(rf_final$finalModel, x_final, x.var=years_op)
-pdp_r <- partialPlot(rf_final$finalModel, x_final, x.var=years_op, which.class="functional needs repair")
-pdp_n <- partialPlot(rf_final$finalModel, x_final, x.var=years_op, which.class="non functional")
-grid.arrange(pdp_f, pdp_r, pdp_n, nrow=1)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ######  V. Prepare submissions  ######
@@ -555,6 +537,27 @@ write.csv(submission_stack, "./output/submission_stack.csv", row.names=F)
 # save final results
 results_all <- results_all %>% mutate(test = c(0.7801, 0.8125, 0.7601, NA, NA, 0.7728, 0.7800))
 saveRDS(results_all, "./models/results_all.rds")
+
+
+#________________________________________________
+#### Update predictions with years_op to reflect current year ####
+x_update <- x_final %>% mutate(years_op = years_op + (2019 - train$year_recorded))
+mean(x_final$years_op)
+mean(x_update$years_op)
+pred_train$update <- predict(rf_final, x_update)
+sum(!pred_train$update==pred_train$rf)
+sum(pred_train$rf=="functional" & pred_train$update=="non functional")
+sum(pred_train$rf=="functional" & pred_train$update=="functional needs repair")
+sum(pred_train$rf=="functional needs repair" & pred_train$update=="non functional")
+sum(pred_train$rf=="functional needs repair" & pred_train$update=="functional")
+sum(pred_train$rf=="non functional" & pred_train$update=="functional")
+sum(pred_train$rf=="non functional" & pred_train$update=="functional needs repair")
+
+## Partial dependence plot
+pdp_f <- partialPlot(rf_final$finalModel, x_final, x.var=years_op)
+pdp_r <- partialPlot(rf_final$finalModel, x_final, x.var=years_op, which.class="functional needs repair")
+pdp_n <- partialPlot(rf_final$finalModel, x_final, x.var=years_op, which.class="non functional")
+grid.arrange(pdp_f, pdp_r, pdp_n, nrow=1)
 
 
 
