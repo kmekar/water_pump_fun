@@ -4,6 +4,7 @@ author: "Kyle Karber"
 date: "May 23, 2019"
 output:
   html_document: default
+  pdf_document: default
   word_document: default
 always_allow_html: yes
 ---
@@ -41,7 +42,6 @@ cb_colors <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
 ```
 
 ```{r data, include=F}
-getwd()
 ## import train and test data
 train <- read.csv(file="../data/train.csv", header=T)
 # need test data?
@@ -50,12 +50,13 @@ train <- read.csv(file="../data/train.csv", header=T)
 base_map <- readRDS("base_map.rds")
 
 ## models and results
-model_rfe <- readRDS("../models/feature_elimination.rds")
+results_rfe <- readRDS("../results/rfe.rds")
+model_rfe_fit <- readRDS("../models/rfe_fit.rds")
+results_rf_tests <- readRDS("../results/rf_tests.rds")
+results_rf_trees <- readRDS("../results/rf_trees.rds")
+results_rf_mtry <- readRDS("../results/rf_mtry.rds")
+results_all <- readRDS("../results/all_models.rds")
 model_rf_final <- readRDS("../models/rf_final.rds")
-results_rf_tests <- readRDS("../models/results_rf_tests.rds")
-results_rf_trees <- readRDS("../models/results_rf_trees.rds")
-model_rf_mtry <- readRDS("../models/rf_mtry.rds")
-results_all <- readRDS("../models/results_all.rds")
 
 ## change certian names for plot aesthetics
 # status_group 
@@ -396,7 +397,7 @@ The results of the recursive feature elimination are shown in the figure below, 
 
 ```{r rf_rfe}
 
-model_rfe$results %>% ggplot(aes(Variables, Accuracy)) +
+results_rfe %>% ggplot(aes(Variables, Accuracy)) +
   geom_point(color="blue") +
   geom_line(color="blue") +
   geom_errorbar(aes(ymin=Accuracy-1.96*AccuracySD/sqrt(10), 
@@ -409,7 +410,7 @@ The variable importance for the 12 variable model is shown in the figure below. 
 
 ```{r rf_imp, fig.width=6.5}
 
-varImpPlot(model_rfe$fit, main=NULL)
+varImpPlot(model_rfe_fit, main=NULL)
 ```
 
 **Parameter Tuning**  
@@ -417,7 +418,7 @@ The RFE results above were obtained with the defualt of $mtry = sqrt(# of variab
 
 ```{r rf_mtry_trees, fig.width=6.5}
 
-p_mtry <- model_rf_mtry$results %>% ggplot(aes(mtry, Accuracy)) +
+p_mtry <- results_rf_mtry %>% ggplot(aes(mtry, Accuracy)) +
   geom_point(color="blue") +
   geom_line(color="blue") +
   geom_errorbar(aes(ymin=Accuracy-1.96*AccuracySD/sqrt(10), 
@@ -522,6 +523,11 @@ In the future, I would like to address the “needs repair” class imbalance. I
 It is worth noting that identifying non-functioning wells is only a small part what is needed to address waterpoint reliability in Sub-Saharan Africa. Funders and installers should be held to high standards, not only in terms of the quality of their installations but also their long-term sustainability. It is important for such projects to get community buy in long before breaking ground. These projects should have maintenance and repair plans in place, use pumps with parts that are locally available, and build local capacity for service and repair.
 
 
+## References
+Chen, T., & Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting System. Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining - KDD '16, 785-794. https://doi.org/10.1145/2939672.2939785  
+Hastie, T., Tibshirani, R., & Friedman, J. (2009). The Elements of Statistical Learning: Data Mining, Inference, and Prediction, Second Edition (2nd ed.). Retrieved from https://www.springer.com/us/book/9780387848570  
+Kuhn, M. (2019). The caret Package. Retrieved from https://topepo.github.io/caret/recursive-feature-elimination.html  
+Kuhn, M., & Johnson, K. (2018). Applied Predictive Modeling (1st ed. 2013, Corr. 2nd printing 2016 edition). New York: Springer.  
 
 
 
