@@ -79,6 +79,9 @@ model_rfe <- readRDS("./models/feature_elimination.rds")
 # save just the results
 results_rfe <- model_rfe$results
 saveRDS(results_rfe, "./results/rfe.rds")
+# save just the fit
+model_rfe_fit <- model_rfe$fit
+saveRDS(model_rfe_fit, "./models/rfe_fit.rds")
 
 #### Tune model parameters ####
 # define 10-fold cross-validation training method

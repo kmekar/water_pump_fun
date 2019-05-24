@@ -524,9 +524,12 @@ It is worth noting that identifying non-functioning wells is only a small part w
 
 
 ## References
-Chen, T., & Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting System. Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining - KDD '16, 785-794. https://doi.org/10.1145/2939672.2939785  
-Hastie, T., Tibshirani, R., & Friedman, J. (2009). The Elements of Statistical Learning: Data Mining, Inference, and Prediction, Second Edition (2nd ed.). Retrieved from https://www.springer.com/us/book/9780387848570  
-Kuhn, M. (2019). The caret Package. Retrieved from https://topepo.github.io/caret/recursive-feature-elimination.html  
+Chen, T., & Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting System. Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining - KDD '16, 785-794. https://doi.org/10.1145/2939672.2939785
+
+Hastie, T., Tibshirani, R., & Friedman, J. (2009). The Elements of Statistical Learning: Data Mining, Inference, and Prediction, Second Edition (2nd ed.). Retrieved from https://www.springer.com/us/book/978038784857
+
+Kuhn, M. (2019). The caret Package. Retrieved from https://topepo.github.io/caret/recursive-feature-elimination.html
+
 Kuhn, M., & Johnson, K. (2018). Applied Predictive Modeling (1st ed. 2013, Corr. 2nd printing 2016 edition). New York: Springer.  
 
 
